@@ -13,7 +13,7 @@ var running_speed = 5.0
 
 var running = false
 
-var ZOOMSPEED = 1
+var ZOOMSPEED = 100
 
 var is_locked = false
 
@@ -52,9 +52,10 @@ func _physics_process(delta):
 		is_locked = false
 	
 	if Input.is_action_just_pressed("kick"):
-		if animation_player.current_animation != "kick":
-			animation_player.play("kick")
-			is_locked = true
+		if is_on_floor():
+			if animation_player.current_animation != "kick":
+				is_locked = true
+				animation_player.play("kick")
 	
 	if Input.is_action_pressed("run"):
 		SPEED = running_speed
