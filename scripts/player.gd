@@ -13,7 +13,32 @@ var running_speed = 5.0
 
 var running = false
 
-var ZOOMSPEED = 100
+@export_group("Camera Zoom")
+## Default distance to set the camera from the player.
+@export var camera_default_distance := 2.0
+## Maximum distance the camera can zoom out to.
+@export var camera_distance_max := 4.0
+## Mininum distance the camera can zoom in to.
+@export var camera_distance_min := 0.01
+## How far the camera will move per zoom input.
+@export var camera_zoom_step := 0.2
+## How quickly the camera zoom interpolates.
+@export var camera_lerp_speed := 5.0
+
+## Toggles camera processing. Setting this to false will lock the camera controls.
+var enabled: bool = true:
+	set(new_enabled):
+		if new_enabled != enabled:
+			enabled = new_enabled
+			set_process(enabled)
+
+# Variable for handling smooth zooming.
+var _spring_arm_target_length := camera_default_distance
+
+## The camera [SpringArm3D], which prevents the camera passing through objects.
+@onready var spring_arm := $camera_mount/SpringArm3D as SpringArm3D
+## The main player [Camera3D].
+@onready var cam := $camera_mount/SpringArm3D/Camera3D_TPC as Camera3D
 
 var is_locked = false
 
@@ -25,6 +50,7 @@ var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
 func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	spring_arm.spring_length = camera_default_distance
 	
 
 func _input(event):
@@ -35,18 +61,26 @@ func _input(event):
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			var translation = Vector3(0, 0, -1)  * ZOOMSPEED  # Adjust the values based on your needs
-			$camera_mount/SpringArm3D/Camera3D.translate_object_local(translation)
-			print(translation)
+			_spring_arm_target_length -= camera_zoom_step
+			_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
 			
 			
-			print("Wheel UP")
+			print(_spring_arm_target_length)
 		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			print("Wheel Down")
-		
+			_spring_arm_target_length += camera_zoom_step
+			_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
+			
+			print(_spring_arm_target_length)
 		
 
 func _physics_process(delta):
+	
+	# Handle smooth camera zooming.
+	if _spring_arm_target_length != spring_arm.spring_length:
+		spring_arm.spring_length = lerp(spring_arm.spring_length, _spring_arm_target_length, camera_lerp_speed * delta)
+		
+	if _spring_arm_target_length == camera_distance_min:
+		print("Zoom To First Person Here")
 	
 	if !animation_player.is_playing():
 		is_locked = false
@@ -99,3 +133,4 @@ func _physics_process(delta):
 	
 	if !is_locked:
 		move_and_slide()
+
