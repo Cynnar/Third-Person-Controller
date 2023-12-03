@@ -85,7 +85,7 @@ func _physics_process(delta):
 				if animation_player.current_animation != "walking":
 					animation_player.play("walking")
 			
-			visuals.look_at(position + direction)
+			visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(-input_dir.x, -input_dir.y), .25)
 		
 		velocity.x = direction.x * SPEED
 		velocity.z = direction.z * SPEED
