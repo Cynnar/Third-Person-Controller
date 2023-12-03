@@ -1,6 +1,7 @@
 extends CharacterBody3D
 
 @onready var camera_mount = $ThirdPersonCamera
+@onready var camera_mount_fpc = $FirstPersonCamera
 @onready var visuals = $visuals
 @onready var animation_player = $visuals/mixamo_base/AnimationPlayer
 
@@ -64,9 +65,14 @@ func _ready():
 
 func _input(event):
 	if event is InputEventMouseMotion:
-		rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
-		visuals.rotate_y(deg_to_rad(event.relative.x * sens_horizontal))
-		camera_mount.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
+		if currentCamera == thirdPersonCamera:
+			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
+			visuals.rotate_y(deg_to_rad(event.relative.x * sens_horizontal))
+			camera_mount.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
+		elif currentCamera == firstPersonCamera:
+			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
+			camera_mount_fpc.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
+			
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -92,8 +98,6 @@ func _physics_process(delta):
 		spring_arm.spring_length = lerp(spring_arm.spring_length, _spring_arm_target_length, camera_lerp_speed * delta)
 		
 	
-		#print("Zoom To First Person Here")
-	
 	if !animation_player.is_playing():
 		is_locked = false
 	
@@ -106,6 +110,7 @@ func _physics_process(delta):
 	if Input.is_action_pressed("run"):
 		SPEED = running_speed
 		running = true
+
 	else:
 		SPEED = walking_speed
 		running = false
