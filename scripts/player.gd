@@ -1,6 +1,6 @@
 extends CharacterBody3D
 
-@onready var camera_mount = $camera_mount
+@onready var camera_mount = $ThirdPersonCamera
 @onready var visuals = $visuals
 @onready var animation_player = $visuals/mixamo_base/AnimationPlayer
 
@@ -36,9 +36,15 @@ var enabled: bool = true:
 var _spring_arm_target_length := camera_default_distance
 
 ## The camera [SpringArm3D], which prevents the camera passing through objects.
-@onready var spring_arm := $camera_mount/SpringArm3D as SpringArm3D
+@onready var spring_arm := $ThirdPersonCamera/SpringArm3D as SpringArm3D
 ## The main player [Camera3D].
-@onready var cam := $camera_mount/SpringArm3D/Camera3D_TPC as Camera3D
+@onready var cam := $ThirdPersonCamera/SpringArm3D/Camera3D as Camera3D
+
+
+
+@onready var thirdPersonCamera := $ThirdPersonCamera/SpringArm3D/Camera3D as Camera3D
+@onready var firstPersonCamera := $FirstPersonCamera/Camera3D as Camera3D
+var currentCamera : Camera3D
 
 var is_locked = false
 
@@ -52,6 +58,9 @@ func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	spring_arm.spring_length = camera_default_distance
 	
+	currentCamera = thirdPersonCamera
+	thirdPersonCamera.make_current()
+	
 
 func _input(event):
 	if event is InputEventMouseMotion:
@@ -61,17 +70,20 @@ func _input(event):
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_spring_arm_target_length -= camera_zoom_step
-			_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
-			
-			
-			print(_spring_arm_target_length)
-		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_spring_arm_target_length += camera_zoom_step
-			_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
-			
-			print(_spring_arm_target_length)
+			if currentCamera == thirdPersonCamera:
+				_spring_arm_target_length -= camera_zoom_step
+				_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
+				
+				if _spring_arm_target_length == 0.01:
+					switch_camera()
 		
+		if event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			if currentCamera == firstPersonCamera:
+				switch_camera()
+			if currentCamera == thirdPersonCamera:
+				_spring_arm_target_length += camera_zoom_step
+				_spring_arm_target_length = clamp(_spring_arm_target_length, camera_distance_min, camera_distance_max)
+				
 
 func _physics_process(delta):
 	
@@ -79,8 +91,8 @@ func _physics_process(delta):
 	if _spring_arm_target_length != spring_arm.spring_length:
 		spring_arm.spring_length = lerp(spring_arm.spring_length, _spring_arm_target_length, camera_lerp_speed * delta)
 		
-	if _spring_arm_target_length == camera_distance_min:
-		print("Zoom To First Person Here")
+	
+		#print("Zoom To First Person Here")
 	
 	if !animation_player.is_playing():
 		is_locked = false
@@ -134,3 +146,12 @@ func _physics_process(delta):
 	if !is_locked:
 		move_and_slide()
 
+func switch_camera():
+	# Toggle between third-person and first-person cameras
+	if currentCamera == thirdPersonCamera:
+		currentCamera = firstPersonCamera
+		firstPersonCamera.make_current()
+		
+	else:
+		currentCamera = thirdPersonCamera
+		thirdPersonCamera.make_current()
