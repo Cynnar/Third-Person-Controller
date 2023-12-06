@@ -26,6 +26,19 @@ var running = false
 ## How quickly the camera zoom interpolates.
 @export var camera_lerp_speed := 5.0
 
+@export var sens_horizontal = 0.5
+@export var sens_vertical = 0.5
+
+@export_group("Camera Clamp")
+## How far up the camera can rotate
+@export var camera_third_person_max := 45
+## How far down the camera can rotate
+@export var camera_third_person_min := -45
+## How far up the camera can rotate in first person
+@export var camera_first_person_max := 90
+## How far down the camera can rotate in first person
+@export var camera_first_person_min := -65
+
 ## Toggles camera processing. Setting this to false will lock the camera controls.
 var enabled: bool = true:
 	set(new_enabled):
@@ -49,9 +62,6 @@ var currentCamera : Camera3D
 
 var is_locked = false
 
-@export var sens_horizontal = 0.5
-@export var sens_vertical = 0.5
-
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
 
@@ -69,9 +79,11 @@ func _input(event):
 			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
 			visuals.rotate_y(deg_to_rad(event.relative.x * sens_horizontal))
 			camera_mount.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
+			camera_mount.rotation.x = clamp(camera_mount.rotation.x, deg_to_rad(camera_third_person_min), deg_to_rad(camera_third_person_max))
 		elif currentCamera == firstPersonCamera:
 			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
 			camera_mount_fpc.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
+			camera_mount_fpc.rotation.x = clamp(camera_mount_fpc.rotation.x, deg_to_rad(camera_first_person_min), deg_to_rad(camera_first_person_max))
 			
 	
 	if event is InputEventMouseButton:
