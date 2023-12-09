@@ -69,6 +69,7 @@ func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	spring_arm.spring_length = camera_default_distance
 	
+	# Sets camera to third person camera
 	currentCamera = thirdPersonCamera
 	thirdPersonCamera.make_current()
 	
