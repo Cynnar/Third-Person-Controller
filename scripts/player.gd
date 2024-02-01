@@ -13,6 +13,7 @@ var walking_speed = 3.0
 var running_speed = 5.0
 
 var running = false
+var jumping = false
 
 @export_group("Camera Zoom")
 ## Default distance to set the camera from the player.
@@ -120,13 +121,15 @@ func _physics_process(delta):
 				is_locked = true
 				animation_player.play("kick")
 	
-	if Input.is_action_pressed("run"):
+	if Input.is_action_pressed("run") and not jumping:
 		SPEED = running_speed
 		running = true
 
 	else:
-		SPEED = walking_speed
-		running = false
+		if is_on_floor():
+			SPEED = walking_speed
+			running = false
+			jumping = false
 	
 	# Add the gravity.
 	if not is_on_floor():
@@ -134,6 +137,7 @@ func _physics_process(delta):
 
 	# Handle Jump.
 	if Input.is_action_just_pressed("ui_accept") and is_on_floor():
+		jumping = true
 		velocity.y = JUMP_VELOCITY
 
 	# Get the input direction and handle the movement/deceleration.
