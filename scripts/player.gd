@@ -3,6 +3,7 @@ extends CharacterBody3D
 @onready var camera_mount = $ThirdPersonCamera
 @onready var camera_mount_fpc = $FirstPersonCamera
 @onready var visuals = $visuals
+@onready var skeleton = $visuals/mixamo_base/Armature/Skeleton3D
 @onready var animation_player = $visuals/mixamo_base/AnimationPlayer
 
 
@@ -167,6 +168,9 @@ func _physics_process(delta):
 	
 	if !is_locked:
 		move_and_slide()
+	
+	if currentCamera == firstPersonCamera:
+		move_camera_with_head(skeleton)
 
 func switch_camera():
 	# Toggle between third-person and first-person cameras
@@ -177,3 +181,10 @@ func switch_camera():
 	else:
 		currentCamera = thirdPersonCamera
 		thirdPersonCamera.make_current()
+
+func move_camera_with_head(skel):
+	var head = skel.find_bone("mixamorig_Head")
+	var head_pos = skel.get_bone_pose(head)
+	var head_rot = skel.get_bone_pose_rotation(head)
+	print("position: ", head_pos)
+	print("rotation: ", head_rot)
