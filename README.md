@@ -1,5 +1,6 @@
 # Third Person Controller
-Third person controller for Godot 4.1
+
+For Godot 4.2
 
 * third person zoom in and out
 * zoom in and out of first person camera
