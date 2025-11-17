@@ -1,10 +1,13 @@
 extends CharacterBody3D
 
 @onready var camera_mount = $ThirdPersonCamera
-@onready var camera_mount_fpc = $FirstPersonCamera
+#@onready var camera_mount_fpc = $FirstPersonCamera
+@onready var first_person_mount = $visuals/HeadBoneAttachment/FirstPersonCamera
 @onready var visuals = $visuals
 @onready var skeleton = $visuals/mixamo_base/Armature/Skeleton3D
 @onready var animation_player = $visuals/mixamo_base/AnimationPlayer
+
+@onready var character_mesh = $visuals/mixamo_base/Armature/Skeleton3D/Beta_Surface as MeshInstance3D
 
 
 var SPEED = 3.0
@@ -15,6 +18,9 @@ var running_speed = 5.0
 
 var running = false
 var jumping = false
+
+## The material slot index for the head mesh.
+@export var head_material_index: int = 0
 
 @export_group("Camera Zoom")
 ## Default distance to set the camera from the player.
@@ -37,9 +43,16 @@ var jumping = false
 ## How far down the camera can rotate
 @export var camera_third_person_min := -45
 ## How far up the camera can rotate in first person
-@export var camera_first_person_max := 90
+@export var camera_first_person_max := 65
 ## How far down the camera can rotate in first person
 @export var camera_first_person_min := -65
+
+@export_group("Head Bobbing")
+@export var enable_head_bob: bool = true
+## Reference to the head bone (adjust name if needed)
+@export var head_bone_name: StringName = &"mixamorig_Head"
+@onready var head_bone_id: int = skeleton.find_bone(head_bone_name)
+
 
 ## Toggles camera processing. Setting this to false will lock the camera controls.
 var enabled: bool = true:
@@ -59,10 +72,13 @@ var _spring_arm_target_length := camera_default_distance
 
 
 @onready var thirdPersonCamera := $ThirdPersonCamera/SpringArm3D/Camera3D as Camera3D
-@onready var firstPersonCamera := $FirstPersonCamera/Camera3D as Camera3D
+@onready var firstPersonCamera := $visuals/HeadBoneAttachment/FirstPersonCamera/Camera3D as Camera3D
 var currentCamera : Camera3D
 
 var is_locked = false
+
+# New variable for head bob
+var initial_fpc_position: Vector3
 
 # Get the gravity from the project settings to be synced with RigidBody nodes.
 var gravity = ProjectSettings.get_setting("physics/3d/default_gravity")
@@ -71,12 +87,20 @@ func _ready():
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	spring_arm.spring_length = camera_default_distance
 	
+	# Store the initial local position of the first person camera for reset
+	initial_fpc_position = firstPersonCamera.position
+	
 	# Sets camera to third person camera
 	currentCamera = thirdPersonCamera
 	thirdPersonCamera.make_current()
 	
 
 func _input(event):
+	# Toggle Head Bobbing
+	if event.is_action_pressed("toggle_head_bob"):
+		enable_head_bob = !enable_head_bob
+		print("Head Bobbing: ", "Enabled" if enable_head_bob else "Disabled")
+		
 	if event is InputEventMouseMotion:
 		if currentCamera == thirdPersonCamera:
 			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
@@ -84,10 +108,18 @@ func _input(event):
 			camera_mount.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
 			camera_mount.rotation.x = clamp(camera_mount.rotation.x, deg_to_rad(camera_third_person_min), deg_to_rad(camera_third_person_max))
 		elif currentCamera == firstPersonCamera:
+			# 1. Horizontal look (rotate the player body)
 			rotate_y(deg_to_rad(-event.relative.x * sens_horizontal))
-			camera_mount_fpc.rotate_x(deg_to_rad(-event.relative.y * sens_vertical))
-			camera_mount_fpc.rotation.x = clamp(camera_mount_fpc.rotation.x, deg_to_rad(camera_first_person_min), deg_to_rad(camera_first_person_max))
 			
+			# 2. Vertical look (rotate the camera mount)
+			first_person_mount.rotate_x(deg_to_rad(event.relative.y * sens_vertical))
+			
+			# 3. Clamp vertical rotation
+			first_person_mount.rotation.x = clamp(
+				first_person_mount.rotation.x,
+				deg_to_rad(camera_first_person_min),
+				deg_to_rad(camera_first_person_max)
+			)
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_WHEEL_UP:
@@ -142,7 +174,6 @@ func _physics_process(delta):
 		velocity.y = JUMP_VELOCITY
 
 	# Get the input direction and handle the movement/deceleration.
-	# As good practice, you should replace UI actions with custom gameplay actions.
 	var input_dir = Input.get_vector("left", "right", "forward", "backward")
 	var direction = (transform.basis * Vector3(input_dir.x, 0, input_dir.y)).normalized()
 	if direction:
@@ -154,8 +185,11 @@ func _physics_process(delta):
 				if animation_player.current_animation != "walking":
 					animation_player.play("walking")
 			
-			visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(-input_dir.x, -input_dir.y), .25)
-		
+			# **MODIFICATION:** Only rotate visuals to face movement direction in Third Person.
+			if currentCamera == thirdPersonCamera:
+				visuals.rotation.y = lerp_angle(visuals.rotation.y, atan2(-input_dir.x, -input_dir.y), .25)
+			# In First Person, the visuals rotation is fixed (or controlled by the player body rotation).
+			
 		velocity.x = direction.x * SPEED
 		velocity.z = direction.z * SPEED
 	else:
@@ -169,22 +203,60 @@ func _physics_process(delta):
 	if !is_locked:
 		move_and_slide()
 	
-	if currentCamera == firstPersonCamera:
-		move_camera_with_head(skeleton)
+	# **NEW:** Apply head bobbing if enabled and in FPC
+	_apply_head_bob()
 
 func switch_camera():
 	# Toggle between third-person and first-person cameras
 	if currentCamera == thirdPersonCamera:
 		currentCamera = firstPersonCamera
 		firstPersonCamera.make_current()
+		# Hide Head (optional, commented out)
+		#character_mesh.set_surface_override_param(
+			#head_material_index,
+			#"albedo_color",
+			#Color(1, 1, 1, 0)
+		#)
 		
 	else:
 		currentCamera = thirdPersonCamera
 		thirdPersonCamera.make_current()
+		
+		# Show Head (optional, commented out)
+		#character_mesh.set_surface_override_param(
+			#head_material_index,
+			#"albedo_color",
+			#Color(1, 1, 1, 1)
+		#)
 
-func move_camera_with_head(skel):
-	var head = skel.find_bone("mixamorig_Head")
-	var head_pos = skel.get_bone_pose(head)
-	var head_rot = skel.get_bone_pose_rotation(head)
-	print("position: ", head_pos)
-	print("rotation: ", head_rot)
+func _apply_head_bob():
+	# Ensure we are in first person and the feature is enabled
+	if currentCamera != firstPersonCamera or !enable_head_bob:
+		# Reset position if bobbing is disabled but camera was previously moved
+		if firstPersonCamera.position != initial_fpc_position:
+			firstPersonCamera.position = initial_fpc_position
+		return
+
+	# Check if the bone ID is valid
+	if head_bone_id == -1:
+		return
+
+	# 1. Get the current position of the head bone relative to the Skeleton3D
+	var head_bone_transform = skeleton.get_bone_global_pose(head_bone_id)
+	
+	# 2. Convert the bone's global position to the player's local space
+	var global_head_pos = skeleton.global_transform * head_bone_transform
+	
+	# Use the first person mount's global position as the reference point
+	var reference_global_pos = first_person_mount.global_transform.origin
+
+	# 3. Calculate the Y offset from the attachment point
+	# We only care about the vertical (Y) displacement from the camera's fixed mount point
+	var y_offset = global_head_pos.origin.y - reference_global_pos.y
+	
+	# 4. Apply the offset to the local camera position
+	# The multiplier may need tuning for your specific character model's scale.
+	var bob_amount = y_offset * 1.5 
+	
+	# Only translate the camera's local Y position relative to its initial value
+	firstPersonCamera.position.y = initial_fpc_position.y + bob_amount
